@@ -1,0 +1,13 @@
+name = "ChordDyn"
+uuid = "59702a34-cda7-4a30-864f-ecdb17ac870d"
+authors = ["Zach Atkins <zach.atkins@colorado.edu>"]
+version = "0.1.0"
+
+[deps]
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Ordinary = "43420745-6aae-494f-933d-9a694e08b911"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
