@@ -6,20 +6,26 @@ let
     x₀ = [π, π - 0.3, 0, 0]
     dt = 1e-3
 
-    X, t = solve(rk4, ∂ₜ(dp); x₀=x₀, t₀=0, tₑ=300, Δt=dt, returnvectors=false)
+    X, t = solve(rk4, ∂ₜ(dp); x₀=x₀, t₀=0, tₑ=100, Δt=dt, returnvectors=false)
 
-    transient = findfirst(t .>= 60)#Int(5 / dt)
+    transient = findfirst(t .>= 90)#Int(5 / dt)
     X = X[:, transient+1:end]
     t = t[transient+1:end]
     tonnetz = Tonnetz()
-    X[1:2, :] = X[2:-1:1, :]
-    # Xhat, that = X, t
-    # SECTIONING WITH AROUND 0.25 WORKS QUITE WELL
-    s = TemporalSection(0.125)
-    Xhat, that = section(s, X, t; interpolate=true)
-    plot_pendulum_on_tonnetz(tonnetz, Xhat, that)
-    chords, durations = trajectory_to_chord_progression(tonnetz, Xhat[2, :], Xhat[1, :], that)
+    chords, durations = trajectory_to_chord_progression(tonnetz, X[1, :], X[2, :], t)
 
     writedlm("output/chords.txt", chords, " ")
     writedlm("output/durations.txt", 2 * durations, " ")
+
+
+    # SECTIONING WITH AROUND 0.125 WORKS QUITE WELL
+    s = TemporalSection(0.125)
+    Xhat, that = section(s, X, t; interpolate=false)
+    plot_pendulum_on_tonnetz(tonnetz, Xhat, that)
+    @show Xhat[1:2, end-4:end]'
+    @show that[end-4:end]
+    section_chords, section_durations = trajectory_to_chord_progression(tonnetz, Xhat[1, :], Xhat[2, :], that)
+
+    writedlm("output/chords-section.txt", section_chords, " ")
+    writedlm("output/durations-section.txt", 2 * section_durations, " ")
 end

@@ -8,7 +8,7 @@ end
 
 function Tonnetz(t::TriangularLattice)
     notes = Matrix{Int}(undef, t.num_height, t.num_width)
-    octave = [round(Int, (j - 1) / 3) + 2 for j in 1:t.num_height]
+    octave = [(round(Int, (j - 1) / 3) % 3) + 3 for j in 1:t.num_height]
     notes[:, 1] = [(7 * (j - 1)) % 12 + 12octave[j] for j in range(1, t.num_height)]
     for i in range(2, t.num_width)
         if i % 2 == 1
