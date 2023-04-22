@@ -1,0 +1,3 @@
+[submodule "submodules/TIVlib"]
+	path = submodules/TIVlib
+	url = git@github.com:aframires/TIVlib.git
