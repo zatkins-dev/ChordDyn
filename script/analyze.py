@@ -12,6 +12,9 @@ from tonal_interval_space import *
 np.set_printoptions(precision=4, linewidth=90)
 
 
+HARMONIC_FUNCTION_D_MAX = 1.6863383443715223
+
+
 def complex_array_str(x):
     return (
         "["
@@ -38,7 +41,7 @@ def dist_mod_12(p, q):
         case (Iterable(), Iterable()):
             p = np.asarray(p)
             q = np.asarray(q)
-            return np.min([np.mod(p - q, 12), np.mod(q - p, 12)], axis=1)
+            return np.min([np.mod(p - q, 12), np.mod(q - p, 12)], axis=0)
         case _:
             return np.min([np.mod(p - q, 12), np.mod(q - p, 12)])
 
@@ -61,85 +64,49 @@ def get_voices(c1: Chord, c2: Chord):
 
 
 def perceptual_unrelatedness(T, Tm1):
-    return np.linalg.norm(T - Tm1)
+    if T == Tm1:
+        return 0.0
+    return (TIV.euclidean(T, Tm1) - D_MIN_TRIAD_TRIAD) / (
+        D_MAX_TRIAD_TRIAD - D_MIN_TRIAD_TRIAD
+    )
 
 
 def dissonance(T):
-    return 1 - np.linalg.norm(T)
+    return T.dissonance()
 
 
 def key_unrelatedness(T, k):
-    return 1 - cos_angle(T, tiv(k))
+    # (1 - np.cos(TIV.cosine(T, tiv(k)))) / 2
+    return scaled_cosine_dist_triad_key(T, tiv(k))
 
 
-def harmonic_function_unrelatedness(T, k):
-    return 1 - cos_angle(T - tiv(k), Tf(T, k))
-
-
-def tonal_pitch_distance(T: np.ndarray, Tm1: np.ndarray, k: Key):
+def harmonic_function_unrelatedness(T: TIV, k):
+    # return (1 - np.cos(TIV.cosine(T, Tf(T, k)))) / 2
     Tkey = tiv(k)
-    theta = angle(T, Tkey) + angle(T - Tkey, Tf(T, k))
-    if Tm1 is None:
-        return np.abs(theta)
-    return np.linalg.norm(T - Tm1) + theta
+    return (
+        1 - np.cos(TIV.cosine(T - Tkey, Tf(T, k) - Tkey))
+    ) / 2  # / HARMONIC_FUNCTION_D_MAX
 
 
-def voice_leading(c: Chord, cm1: Chord, k: Key):
+def anti_voice_leading(c: Chord, cm1: Chord, k: Key):
     v1, v2 = get_voices(cm1, c)
-    T = tiv(c)
-    Tm1 = tiv(cm1)
-    Tkey = tiv(k)
-    den = np.linalg.norm(T - Tm1)
     s = dist_mod_12(v1, v2)
     num = 0.0
+    if sum(s) == 0:
+        return 0.0
     for pc, dist in zip(v2, s):
-        Tnl = tiv(Note(pitchClass=pc))
-        num += np.linalg.norm(Tnl - Tkey) * np.exp(0.05 * dist)
-    return num / den
+        cos_dist = scaled_cosine_dist_note_key(tiv([pc]), tiv(k))
+        num += cos_dist * np.exp(0.05 * (dist - 5)) / 3
+    return num * perceptual_unrelatedness(tiv(c), tiv(cm1))
 
 
 def tonal_fitness(ci, cim1, k):
     Ti = tiv(ci)
     Tim1 = tiv(cim1) if cim1 else None
-    delta = tonal_pitch_distance(Ti, Tim1, k)
     c = dissonance(Ti)
-    m = voice_leading(ci, cim1, k)
+    m = anti_voice_leading(ci, cim1, k)
     h = 0
     return np.array([4.22, 2.14, 2.06, 3.78]).dot(np.array([delta, c, m, h]))
-
-
-def analyze_progressions(full_progression, window):
-    P_tiv = [tiv(c) for c in full_progression]
-    for i in range(len(full_progression) - window):
-        s = Stream(full_progression[i : (i + window)])
-        k = guess_key(s)
-        s1 = Stream()
-        for c in s:
-            new_c = Chord([pitch_in_key(n.pitch, k) for n in c.notes])
-            s1.append(new_c.closedPosition(forceOctave=4))
-        s = s1
-        rns = [m21.roman.romanNumeralFromChord(c, k).romanNumeral for c in s]
-        print(f"key {k}: {' '.join(rns)}")
-        print(f"   Tkey: {complex_array_str(tiv(k))}")
-        for j in range(0, window):
-            Tj = P_tiv[i + j]
-            Tjm1 = P_tiv[i + (j - 1) % window]
-            delta = perceptual_unrelatedness(Tj, Tjm1)
-            xi = dissonance(Tj)
-            ell = key_unrelatedness(Tj, k)
-            phi = harmonic_function_unrelatedness(Tj, k)
-            vl = voice_leading(
-                full_progression[i + j], full_progression[i + (j - 1) % window], k
-            )
-            print(f"  {rns[j]} {s[j].orderedPitchClasses} ({s[j].pitchedCommonName})")
-            print(f"    T(c) = {complex_array_str(Tj)}")
-            if j > 0:
-                print(f"    perceptual_unrelatedness        = {delta}")
-            print(f"    dissonance                      = {xi}")
-            print(f"    key_unrelatedness               = {ell}")
-            print(f"    harmonic_function_unrelatedness = {phi}")
-            print(f"    melodic attraction              = {vl}")
-        print()
 
 
 def get_time_signature(window):
@@ -248,15 +215,60 @@ def annotate(progression, window, closedPosition=False):
     return aprog
 
 
+def analyze_progressions(full_progression, window):
+    P_tiv = [tiv(c) for c in full_progression]
+    for i in range(len(full_progression) - window):
+        s = Stream(full_progression[i : (i + window)])
+        k = guess_key(s)
+        s1 = Stream()
+        for c in s:
+            new_c = Chord([pitch_in_key(n.pitch, k) for n in c.notes])
+            s1.append(new_c.closedPosition(forceOctave=4))
+        s = s1
+        rns = [m21.roman.romanNumeralFromChord(c, k).romanNumeral for c in s]
+        print(f"key {k}: {' '.join(rns)}")
+        print(f"   Tkey: {complex_array_str(tiv(k).vector)}")
+        for j in range(0, window):
+            Tj = P_tiv[i + j]
+            Tjm1 = P_tiv[i + (j - 1) % window]
+            delta = perceptual_unrelatedness(Tj, Tjm1)
+            xi = dissonance(Tj)
+            ell = key_unrelatedness(Tj, k)
+            phi = harmonic_function_unrelatedness(Tj, k)
+            vl = anti_voice_leading(
+                full_progression[i + j], full_progression[i + (j - 1) % window], k
+            )
+            print(f"  {rns[j]} {s[j].orderedPitchClasses} ({s[j].pitchedCommonName})")
+            print(f"    T(c) = {complex_array_str(Tj.vector)}")
+            if j > 0:
+                print(f"    perceptual unrelatedness        = {delta}")
+                print(f"    melodic unattraction            = {vl}")
+            print(f"    dissonance                      = {xi}")
+            print(f"    key unrelatedness               = {ell}")
+            print(f"    harmonic function unrelatedness = {phi}")
+
+        print(f"  Progression:")
+
+        print()
+
+
 if __name__ == "__main__":
     s = Stream()
-    for c in read_progression("output/chords.txt", "output/durations.txt"):
+    for c in read_progression(
+        "output/chords.txt", "output/durations.txt", max_chords=15
+    ):
         s.append(c)
-    # for c1, c2 in zip(s[:-1], s[1:]):
-    #     pc1, pc2 = c1.orderedPitchClassesString, c2.orderedPitchClassesString
-    #     print(f"{pc1} -> {pc2}:")
-    #     nl1, nl2 = get_voices(c1, c2)
-    #     print(f"  voice ordered: {nl1} -> {nl2}")
-    # analyze_progressions(s, 4)
-    annotated = annotate(s, 3, closedPosition=True)
-    annotated.show()
+    analyze_progressions(s, 3)
+    # print(f"max dist: {max_distance()}")
+    # print(f"max dist note from major: {max_distance_from_key(1)}")
+    # print(f"max dist note from minor: {max_distance_from_key(1, mode='minor')}")
+
+    # print(f"max dist triad from major: {max_distance_from_key(3)}")
+    # print(f"max dist triad from minor: {max_distance_from_key(3, mode='minor')}")
+    # print(f"min dist note from major: {min_distance_from_key(1)}")
+    # print(f"min dist note from minor: {min_distance_from_key(1, mode='minor')}")
+
+    # print(f"min dist triad from major: {min_distance_from_key(3)}")
+    # print(f"min dist triad from minor: {min_distance_from_key(3, mode='minor')}")
+    # annotated = annotate(s, 3, closedPosition=True)
+    # annotated.show()
