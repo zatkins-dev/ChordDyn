@@ -20,8 +20,8 @@ end
 
 ## Getters
 points(t::TriangularLattice) = t.points[:]
-tri_side(t::TriangularLattice) = √3 / 2 * tri_height(t)
-tri_height(t::TriangularLattice) = 1 / t.num_height
+tri_x(t::TriangularLattice) = √3 / 2 * tri_y(t)
+tri_y(t::TriangularLattice) = 1 / t.num_height
 xlims(t::TriangularLattice) = t.xlims
 ylims(t::TriangularLattice) = t.ylims
 xlength(t::TriangularLattice) = t.xlims[2] - t.xlims[1]

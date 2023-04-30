@@ -3,8 +3,8 @@ module ChordDyn
 
 using Revise
 using Ordinary
-using GLMakie
-using GeometryBasics
+using CairoMakie
+using Makie.GeometryBasics
 using LinearAlgebra
 using StaticArrays
 using LaTeXStrings

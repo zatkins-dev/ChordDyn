@@ -27,8 +27,8 @@ function dt_color(t; colormap=:seaborn_deep)
     return cm, middles, labels, colors
 end
 
-function trajectory!(X, V; colors=1:size(X, 2), colormap=:seaborn_deep, label=undef)
-    arrows!(X[1, :], X[2, :], V[1, :], V[2, :], arrowsize=8, arrowcolor=colors, linecolor=colors, linewidth=1, colormap=colormap, label=label)
+function trajectory!(X, V; colors=1:size(X, 2), colormap=:batlow, label=undef, arrowsize=32, linewidth=4)
+    arrows!(X[1, :], X[2, :], V[1, :], V[2, :], arrowsize=arrowsize, arrowcolor=colors, linecolor=colors, linewidth=linewidth, colormap=colormap, label=label)
 end
 
 function arrow3d!(x, y, z, u, v, w; as=0.1, lc=:black, lw=0.4)
@@ -69,33 +69,132 @@ end
 
 note_marker(n::Int) = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'χ', 'ε'][mod(n, 12)+1]
 
+function get_triangles(t::TriangularLattice, color=:blue)
+    xs = xlims(t)
+    ys = ylims(t)
+    if color == :blue
+        centers = points(t) .+ Vec2f(tri_x(t) / 2, 0)
+    else
+        centers = points(t) .- Vec2f(tri_x(t) / 2, 0)
+    end
+    tri_points = [Point2f.(p) for p in closest_points.(Ref(t), centers)]
+    triangles = Polygon[]
+    split_triangles = Polygon[]
+    for pts in tri_points
+        at_top = Vector{Bool}(undef, 3)
+        at_bottom = Vector{Bool}(undef, 3)
+        at_left = Vector{Bool}(undef, 3)
+        at_right = Vector{Bool}(undef, 3)
+        for (i, p) in enumerate(pts)
+            at_top[i] = abs(p[2] + tri_y(t) / 2 - ys[2]) < 1e-6
+            at_bottom[i] = abs(p[2] - ys[1]) < 1e-6
+            at_left[i] = abs(p[1] - xs[1]) < 1e-6
+            at_right[i] = abs(p[1] + tri_x(t) - xs[2]) < 1e-6
+        end
+
+        if any(at_right)
+            for i in eachindex(pts)
+                if at_left[i]
+                    pts[i] += Vec2f(xs[2], 0)
+                end
+            end
+        end
+
+        if !(any(at_top) && any(at_bottom))
+            push!(triangles, Polygon(pts))
+        elseif any(at_top) && any(at_bottom)
+            last_p = pts[.!at_top.&&.!at_bottom][1]
+            if last_p[2] > ys[2] / 2
+                for i in eachindex(pts)
+                    if at_bottom[i]
+                        pts[i] = Vec2f(pts[i][1], ys[2])
+                    end
+                end
+                push!(triangles, Polygon(pts))
+            else
+                top_tri = deepcopy(pts)
+                for i in eachindex(top_tri)
+                    if !at_top[i]
+                        top_tri[i] = Point2f(top_tri[i][1], ys[2])
+                    end
+                end
+                push!(split_triangles, Polygon([top_tri[at_bottom][1], top_tri[at_top][1], top_tri[.!at_bottom.&&.!at_top][1]]))
+                bottom_tri = deepcopy(pts)
+                for i in eachindex(bottom_tri)
+                    if at_top[i]
+                        bottom_tri[i] = Point2f(bottom_tri[i][1], ys[1])
+                    end
+                end
+                push!(split_triangles, Polygon([bottom_tri[at_bottom][1], bottom_tri[.!at_bottom.&&.!at_top][1], bottom_tri[at_top][1]]))
+            end
+        elseif any(at_top) && !any(at_bottom) && !(any(at_left) && any(at_right))
+            push!(triangles, Polygon(pts))
+        end
+    end
+    return triangles, split_triangles
+end
+
 function plot(tonnetz::Tonnetz; xres=1920)
-    markers = note_marker.(notes(tonnetz))
     aspect = xlength(tonnetz) / ylength(tonnetz)
     f = Figure(resolution=(xres, xres / aspect))
-    ax = Axis(f[1, 1]; aspect=aspect)
-    p = scatter!(points(tonnetz); marker=markers, markersize=32, label=nothing)
-    xs = xlims(tonnetz)
-    ys = ylims(tonnetz)
-    domain = Rect2f((0, 0), (xlength(tonnetz), ylength(tonnetz)))
-    recmesh = GeometryBasics.mesh(domain)
-    Makie.mesh!(recmesh; color=(:orange, 0.1))
-    xlims!(xs[1] - 0.1, xs[2] + 0.1)
-    ylims!(ys[1] - 0.1, ys[2] + 0.1)
+    ax = Axis(f[1, 1], xgridvisible=false, ygridvisible=false, xticksvisible=false, yticksvisible=false)
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    for color in [:blue, :red]
+        triangles, split_triangles = get_triangles(lattice(tonnetz), color)
+        for t in triangles
+            poly!(t, color=(color, 0.2), label=nothing, strokewidth=0, transparent=true)
+            c = coordinates(t)
+            lines!([c..., c[1]]; color=:black, linewidth=2, label=nothing, transparent=true)
+        end
+        for t in split_triangles
+            poly!(t; color=(color, 0.2), label=nothing, strokewidth=0, transparent=true)
+            lines!(coordinates(t); color=:black, linewidth=2, label=nothing, transparent=true)
+        end
+    end
+    split_triangles = Polygon[]
+
+    markers = note_marker.(notes(tonnetz))
+    scatter!(points(tonnetz); marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
+    scatter!(points(tonnetz); marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
+    scatter!(points(tonnetz); marker=markers, color=:black, markersize=32, label=nothing, transparent=false)
+    left_col = points(tonnetz)[1:12] .+ Vec2f(xlength(tonnetz), 0)
+    scatter!(left_col; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
+    scatter!(left_col; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
+    scatter!(left_col; marker=markers[1:12], color=:black, markersize=32, label=nothing, transparent=false)
+    top_row = points(tonnetz)[1:24:end] .+ Vec2f(0, ylength(tonnetz))
+    scatter!(top_row; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
+    scatter!(top_row; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
+    scatter!(top_row; marker=markers[1:24:end], color=:black, markersize=32, label=nothing, transparent=false)
+    tl = points(tonnetz)[1] .+ Vec2f(xlength(tonnetz), ylength(tonnetz))
+    scatter!(tl; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
+    scatter!(tl; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
+    scatter!(tl; marker=markers[1], color=:black, markersize=32, label=nothing, transparent=false)
     resize_to_layout!(f)
     return f, ax
 end
 
-function plot_pendulum_on_tonnetz(tonnetz, X, t)
+function plot_pendulum_on_tonnetz(tonnetz, X, t; arrowsize=24, linewidth=4)
     fig, ax = plot(tonnetz)
     pts = project_onto.(Ref(tonnetz.t), X[1, :], X[2, :])
     θ₁ = [p[1] for p in pts]
     θ₂ = [p[2] for p in pts]
     xs = hcat(θ₁, θ₂)'
-    V = xs[:, 2:end] - xs[:, 1:end-1]
-    trajectory!(xs[:, 1:end-1], V, colors=t[1:end-1])
-    save("output/pendulum_on_tonnetz.png", fig, px_per_unit=2)
-    display(fig)
+    vx = θ₁[2:end] - θ₁[1:end-1]
+    vy = θ₂[2:end] - θ₂[1:end-1]
+    for i in eachindex(vx)
+        if abs(vx[i]) > 0.75 * xlength(tonnetz)
+            vx[i] = -sign(vx[i]) * (xlength(tonnetz) - abs(vx[i]))
+        end
+        if abs(vy[i]) > 0.75 * ylength(tonnetz)
+            vy[i] = -sign(vy[i]) * (ylength(tonnetz) - abs(vy[i]))
+        end
+    end
+    V = hcat(vx, vy)'
+    trajectory!(xs[:, 1:end-1], V; colors=:black, arrowsize=arrowsize + 3, linewidth=linewidth + 1.5)
+    trajectory!(xs[:, 1:end-1], V, colors=t[1:end-1]; arrowsize=arrowsize, linewidth=linewidth)
+    return fig, ax
 end
 
 function animate_pendulum(dp::DoublePendulum, θ₁, θ₂, t; output="output/pendulum_anim.mp4", framerate=nothing)
@@ -123,8 +222,7 @@ function animate_pendulum(dp::DoublePendulum, θ₁, θ₂, t; output="output/pe
     else
         itr = round.(range(1, length(t), length=round(Int, (t[end] - t[1]) * framerate)))
     end
-    record(fig, output, itr;
-        framerate=framerate) do frame
+    record(fig, output, itr; framerate=framerate) do frame
         tstep[] = frame
     end
 end

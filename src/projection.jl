@@ -2,9 +2,21 @@ export project_onto, trajectory_to_chord_progression
 
 function project_onto(t::TriangularLattice, θ1, θ2)
     """Convert θ1, θ2 ∈ [0, 2π]² to t.xlims × t.ylims"""
-    local x = rescale_to_lims(mod(θ1 + π, 16π) / 16π, xlims(t))
-    local y = rescale_to_lims(mod(θ2 + π, 6π) / 6π, ylims(t))
+    local x = rescale_to_lims(mod(θ1, 16π) / 16π, xlims(t))
+    local y = rescale_to_lims(mod(θ2, 12π) / 12π, ylims(t))
     x, y
+end
+
+function closest_points(t::TriangularLattice, p)
+    dims = Vec2f(xlength(t), ylength(t))
+    p_wrapped = Vec2f(mod.(p, dims))
+    distances = [periodic_distance(point, p_wrapped; dims=dims) for point in points(t)]
+    closest = partialsortperm(norm.(distances), 1:3)
+    return points(t)[closest]
+end
+
+function closest_points(tonnetz::Tonnetz, p)
+    closest_points(lattice(tonnetz), p)
 end
 
 function project_onto(tonnetz::Tonnetz, θ1, θ2, notemode=false)
