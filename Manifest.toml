@@ -722,7 +722,9 @@ version = "1.4.1"
 
 [[deps.Ordinary]]
 deps = ["LaTeXStrings", "LinearAlgebra", "Revise", "SparseArrayKit"]
-path = "C:\\Users\\zacha\\.julia\\dev\\Ordinary"
+git-tree-sha1 = "0d259f05a8b430ffe4766e58187a61a68390b27a"
+repo-rev = "main"
+repo-url = "https://github.com/zatkins-dev/Ordinary.jl.git"
 uuid = "43420745-6aae-494f-933d-9a694e08b911"
 version = "0.1.0"
 
