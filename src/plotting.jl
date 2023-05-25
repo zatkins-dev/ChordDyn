@@ -1,4 +1,5 @@
-export LatexTicks, dt_color, trajectory!, trajectory3!, arrow3d!, plot, plot_pendulum_on_tonnetz, animate_pendulum, note_marker
+export LatexTicks, dt_color, trajectory!, trajectory3!, arrow3d!, plot, plot_pendulum_on_tonnetz, animate_pendulum, draw_pendulum!, note_marker
+import CairoMakie.plot
 
 ## Plotting Utilities
 struct LatexTicks
@@ -134,10 +135,10 @@ function get_triangles(t::TriangularLattice, color=:blue)
     return triangles, split_triangles
 end
 
-function plot(tonnetz::Tonnetz; xres=1920)
+function CairoMakie.plot(tonnetz::Tonnetz; xres=1920)
     aspect = xlength(tonnetz) / ylength(tonnetz)
-    f = Figure(resolution=(xres, xres / aspect))
-    ax = Axis(f[1, 1], xgridvisible=false, ygridvisible=false, xticksvisible=false, yticksvisible=false)
+    f = Figure(resolution=(xres, xres / aspect), backgroundcolor=:transparent)
+    ax = Axis(f[1, 1], xgridvisible=false, ygridvisible=false, xticksvisible=false, yticksvisible=false, backgroundcolor=:transparent)
     hidespines!(ax)
     hidedecorations!(ax)
 
@@ -158,19 +159,19 @@ function plot(tonnetz::Tonnetz; xres=1920)
     markers = note_marker.(notes(tonnetz))
     scatter!(points(tonnetz); marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(points(tonnetz); marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    scatter!(points(tonnetz); marker=markers, color=:black, markersize=32, label=nothing, transparent=false)
+    text!(points(tonnetz); text="" .* (markers), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
     left_col = points(tonnetz)[1:12] .+ Vec2f(xlength(tonnetz), 0)
     scatter!(left_col; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(left_col; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    scatter!(left_col; marker=markers[1:12], color=:black, markersize=32, label=nothing, transparent=false)
+    text!(left_col; text="" .* (markers[1:12]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
     top_row = points(tonnetz)[1:24:end] .+ Vec2f(0, ylength(tonnetz))
     scatter!(top_row; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(top_row; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    scatter!(top_row; marker=markers[1:24:end], color=:black, markersize=32, label=nothing, transparent=false)
+    text!(top_row; text="" .* (markers[1:24:end]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
     tl = points(tonnetz)[1] .+ Vec2f(xlength(tonnetz), ylength(tonnetz))
     scatter!(tl; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(tl; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    scatter!(tl; marker=markers[1], color=:black, markersize=32, label=nothing, transparent=false)
+    text!(tl; text="" * markers[1], font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
     resize_to_layout!(f)
     return f, ax
 end
@@ -197,23 +198,57 @@ function plot_pendulum_on_tonnetz(tonnetz, X, t; arrowsize=24, linewidth=4)
     return fig, ax
 end
 
+function draw_pendulum!(dp::DoublePendulum, θ₁, θ₂, t)
+    x1, y1 = dp.ℓ₁ * sin(θ₁), -dp.ℓ₁ * cos(θ₁)
+    x2, y2 = x1 + dp.ℓ₂ * sin(θ₂), y1 - dp.ℓ₂ * cos(θ₂)
+
+    lines!([0, x1], [0, y1], color=:black, linewidth=10)
+    lines!([0, x1], [0, y1]; color=:red, linewidth=6)
+    lines!([x1, x2], [y1, y2], color=:black, linewidth=10)
+    lines!([x1, x2], [y1, y2]; color=:red, linewidth=6)
+    scatter!(0, 0, color=:black, markersize=20)
+
+    scatter!(x1, y1; color=:black, markersize=96)
+    scatter!(x1, y1; color=:white, markersize=88)
+    text!(x1, y1; text=L"m_1", align=(:center, :center), color=:black, textsize=40, markerspace=:pixel)
+    scatter!(x2, y2; color=:black, markersize=96 * dp.m₂ / dp.m₁)
+    scatter!(x2, y2; color=:white, markersize=88 * dp.m₂ / dp.m₁)
+    text!(x2, y2; text=L"m_2", align=(:center, :center), color=:black, textsize=40, markerspace=:pixel)
+    text!(0.5, 1, align=(:center, :top), text=latexstring("t = $(round(t, digits = 1))"), textsize=48, space=:relative)
+end
+
 function animate_pendulum(dp::DoublePendulum, θ₁, θ₂, t; output="output/pendulum_anim.mp4", framerate=nothing)
     tstep = Observable(1)
     dt = t[2] - t[1]
 
     x1, y1 = @lift(dp.ℓ₁ * sin(θ₁[$tstep])), @lift(-dp.ℓ₁ * cos(θ₁[$tstep]))
     x2, y2 = @lift($x1 + dp.ℓ₂ * sin(θ₂[$tstep])), @lift($y1 - dp.ℓ₂ * cos(θ₂[$tstep]))
+    f = Figure(resolution=(1200, 1200), backgroundcolor=:white)
+    ax = Axis(f[1, 1],
+        aspect=1,
+        xgridvisible=false,
+        ygridvisible=false,
+        xticksvisible=false,
+        yticksvisible=false,
+        backgroundcolor=:white,
+        limits=(-dp.ℓ₁ - dp.ℓ₂ - 0.1, dp.ℓ₁ + dp.ℓ₂ + 0.1, -dp.ℓ₁ - dp.ℓ₂ - 0.1, dp.ℓ₁ + dp.ℓ₂ + 0.1),
+    )
+    hidespines!(ax)
+    hidedecorations!(ax)
 
-    fig, ax = lines(@lift([0, $x1]), @lift([0, $y1]), color=:blue, linewidth=4,
-        axis=(title=@lift("t = $(round(t[$tstep], digits = 1))"),))
+    lines!(@lift([0, $x1]), @lift([0, $y1]), color=:black, linewidth=10)
+    lines!(@lift([0, $x1]), @lift([0, $y1]); color=:red, linewidth=6)
+    lines!(@lift([$x1, $x2]), @lift([$y1, $y2]), color=:black, linewidth=10)
+    lines!(@lift([$x1, $x2]), @lift([$y1, $y2]); color=:red, linewidth=6)
+    scatter!(0, 0, color=:black, markersize=20)
 
-    lines!(@lift([$x1, $x2]), @lift([$y1, $y2]); color=:red, linewidth=4)
-    scatter!(x1, y1; color=:blue, markersize=50)
-    scatter!(x2, y2; color=:blue, markersize=50 * dp.m₂ / dp.m₁)
-
-    total_length = dp.ℓ₁ + dp.ℓ₂
-    pad = 0.1 * total_length
-    limits!(ax, -total_length - pad, total_length + pad, -total_length - pad, total_length + pad)
+    scatter!(x1, y1; color=:black, markersize=96)
+    scatter!(x1, y1; color=:white, markersize=88)
+    text!(x1, y1; text=L"m_1", align=(:center, :center), color=:black, textsize=40, markerspace=:pixel)
+    scatter!(x2, y2; color=:black, markersize=96 * dp.m₂ / dp.m₁)
+    scatter!(x2, y2; color=:white, markersize=88 * dp.m₂ / dp.m₁)
+    text!(x2, y2; text=L"m_2", align=(:center, :center), color=:black, textsize=40, markerspace=:pixel)
+    text!(0.5, 1, align=(:center, :top), text=@lift(latexstring("t = $(round(t[$tstep], digits = 1))")), textsize=48, space=:relative)
 
     itr = nothing
     if isnothing(framerate)
@@ -222,7 +257,7 @@ function animate_pendulum(dp::DoublePendulum, θ₁, θ₂, t; output="output/pe
     else
         itr = round.(range(1, length(t), length=round(Int, (t[end] - t[1]) * framerate)))
     end
-    record(fig, output, itr; framerate=framerate) do frame
+    record(f, output, itr; framerate=framerate) do frame
         tstep[] = frame
     end
 end

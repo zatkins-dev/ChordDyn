@@ -41,6 +41,15 @@ def dist_mod_12(p, q):
         case (Iterable(), Iterable()):
             p = np.asarray(p)
             q = np.asarray(q)
+            if p.shape != q.shape:
+                longer = p if p.shape[0] > q.shape[0] else q
+                shorter = p if p.shape[0] < q.shape[0] else q
+                options = [
+                    longer[i : i + shorter.shape[0]]
+                    for i in range(longer.shape[0] - shorter.shape[0] + 1)
+                ]
+                dists = [dist_mod_12(shorter, o) for o in options]
+                return dists[np.argmin([np.sum(d) for d in dists])]
             return np.min([np.mod(p - q, 12), np.mod(q - p, 12)], axis=0)
         case _:
             return np.min([np.mod(p - q, 12), np.mod(q - p, 12)])
@@ -52,8 +61,7 @@ def get_voices(c1: Chord, c2: Chord):
     num_pitches = len(pc1)
     choices = [p for p in permutations(range(num_pitches), num_pitches)]
     semitone_dist = [
-        [dist_mod_12(pc2[i], pc1[j]) for (i, j) in zip(range(num_pitches), p)]
-        for p in choices
+        dist_mod_12(np.asarray(pc2), np.asarray(pc1)[list(p)]) for p in choices
     ]
     total_dist = [sum(st_dist) for st_dist in semitone_dist]
     min_ind = np.argmin(total_dist)

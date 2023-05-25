@@ -4,7 +4,7 @@ using CairoMakie
 let
     t = Tonnetz()
     fig, ax = ChordDyn.plot(t)
-    save("output/tonnetz.svg", fig)
+    save("output/tonnetz.png", fig, px_per_unit=2)
 
     # return AssertionError("fix tonnetz plotting, especially the triangles on the edges")
 
