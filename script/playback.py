@@ -50,9 +50,7 @@ if __name__ == "__main__":
     #     progression.append(n)
     # progression.show()
     # output = Stream()
-    for c in read_progression(
-        "output/chords.txt", "output/durations.txt", True, force_octave=5
-    ):
+    for c in read_progression("output/chords.txt", "output/durations.txt", True):
         symbol = m21.harmony.chordSymbolFromChord(c)
         progression.append(symbol)
         progression.append(c)

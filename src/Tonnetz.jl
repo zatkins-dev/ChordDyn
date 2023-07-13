@@ -6,23 +6,24 @@ struct Tonnetz
     notes::Matrix{Int}
 end
 
-function Tonnetz(t::TriangularLattice)
+function Tonnetz(t::TriangularLattice; startoctave::Int=3)
     notes = Matrix{Int}(undef, t.num_height, t.num_width)
-    octave = [(round(Int, (j - 1) / 3) % 3) + 3 for j in 1:t.num_height]
-    notes[:, 1] = [(7 * (j - 1)) % 12 + 12octave[j] for j in range(1, t.num_height)]
-    for i in range(2, t.num_width)
+    notes[:, 1] = 12startoctave .+ [0, 7, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5]
+    notes[:, 2] = 12startoctave .+ [4, -1, 6, 1, -4, 3, -2, 5, 0, 7, 2, -3]
+    for i in 3:t.num_width
         if i % 2 == 1
-            notes[:, i] = (notes[:, i-1] .- 3 .+ 12) .% 12 + 12octave
+            notes[:, i] = notes[:, 1] .+ (((i - 1) ÷ 2) % 12)
         else
-            notes[:, i] = (notes[:, i-1] .+ 4) .% 12 + 12octave
+            notes[:, i] = notes[:, 2] .+ (((i - 1) ÷ 2) % 12)
         end
+        notes[:, i] -= 12 * ((notes[:, i] .+ 3) .÷ 12 .> startoctave)
     end
     return Tonnetz(t, notes)
 end
 
-function Tonnetz()
+function Tonnetz(; kwargs...)
     t = TriangularLattice(24, 12)
-    Tonnetz(t)
+    Tonnetz(t; kwargs...)
 end
 
 lattice(t::Tonnetz) = t.t

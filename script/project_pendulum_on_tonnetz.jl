@@ -13,7 +13,7 @@ let
     X = X[:, transient+1:end]
     t = t[transient+1:end]
 
-    tonnetz = Tonnetz()
+    tonnetz = Tonnetz(; startoctave=5)
     fig, ax = plot_pendulum_on_tonnetz(tonnetz, X, t, arrowsize=12, linewidth=2)
     save("output/pendulum_on_tonnetz.png", fig, px_per_unit=2)
     chords, durations = trajectory_to_chord_progression(tonnetz, X[1, :], X[2, :], t)
