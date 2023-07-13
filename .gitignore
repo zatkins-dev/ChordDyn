@@ -1,5 +1,5 @@
 .vscode
 **/__pycache__
 *.code-workspace
-output
+output*
 *.png
