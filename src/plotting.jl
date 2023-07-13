@@ -1,4 +1,4 @@
-export LatexTicks, dt_color, trajectory!, trajectory3!, arrow3d!, plot, plot_pendulum_on_tonnetz, animate_pendulum, draw_pendulum!, note_marker
+export LatexTicks, dt_color, trajectory!, trajectory3!, arrow3d!, plot, plot_pendulum_on_tonnetz, animate_pendulum, draw_pendulum!
 import CairoMakie.plot
 
 ## Plotting Utilities
@@ -68,7 +68,12 @@ function plot(t::TriangularLattice; xres=1920)
     return f, ax
 end
 
-note_marker(n::Int) = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'χ', 'ε'][mod(n, 12)+1]
+eharmonic(n::Int) = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "χ", "ε"][mod(n, 12)+1]
+midi(n::Int) = "$n"
+octave(n::Int) = "$(n ÷ 12)"
+note(n::Int) = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", 'B'][mod(n, 12)+1]
+
+vertexlabel_fns = (:eharmonic, :midi, :octave, :note)
 
 function get_triangles(t::TriangularLattice, color=:blue)
     xs = xlims(t)
@@ -135,7 +140,9 @@ function get_triangles(t::TriangularLattice, color=:blue)
     return triangles, split_triangles
 end
 
-function CairoMakie.plot(tonnetz::Tonnetz; xres=1920)
+function CairoMakie.plot(tonnetz::Tonnetz; xres=1920, vertexlabels=:eharmonic)
+    @assert vertexlabels in vertexlabel_fns "vertexlabels must be one of $(vertexlabel_fns)"
+
     aspect = xlength(tonnetz) / ylength(tonnetz)
     f = Figure(resolution=(xres, xres / aspect), backgroundcolor=:transparent)
     ax = Axis(f[1, 1], xgridvisible=false, ygridvisible=false, xticksvisible=false, yticksvisible=false, backgroundcolor=:transparent)
@@ -156,22 +163,24 @@ function CairoMakie.plot(tonnetz::Tonnetz; xres=1920)
     end
     split_triangles = Polygon[]
 
-    markers = note_marker.(notes(tonnetz))
+    markers = eval(:($vertexlabels.(notes($tonnetz))))
+    longest_marker = maximum(length.(markers))
+    textsize = 32 - 4 * (longest_marker - 1)
     scatter!(points(tonnetz); marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(points(tonnetz); marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(points(tonnetz); text="" .* (markers), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
+    text!(points(tonnetz); text="" .* (markers), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
     left_col = points(tonnetz)[1:12] .+ Vec2f(xlength(tonnetz), 0)
     scatter!(left_col; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(left_col; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(left_col; text="" .* (markers[1:12]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
+    text!(left_col; text="" .* (markers[1:12]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
     top_row = points(tonnetz)[1:24:end] .+ Vec2f(0, ylength(tonnetz))
     scatter!(top_row; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(top_row; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(top_row; text="" .* (markers[1:24:end]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
+    text!(top_row; text="" .* (markers[1:24:end]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
     tl = points(tonnetz)[1] .+ Vec2f(xlength(tonnetz), ylength(tonnetz))
     scatter!(tl; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(tl; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(tl; text="" * markers[1], font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=32, transparent=false)
+    text!(tl; text="" * markers[1], font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
     resize_to_layout!(f)
     return f, ax
 end
