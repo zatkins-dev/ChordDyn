@@ -180,10 +180,7 @@ def annotate(progression, window, closedPosition=False):
 
     ts = get_time_signature(window)
     part.timeSignature = ts
-    if closedPosition:
-        part.append(m21.clef.TrebleClef())
-    else:
-        part.append(m21.clef.BassClef())
+    part.append(m21.clef.TrebleClef())
     # part.append(ts)
     one_beat = m21.duration.Duration(1 * ts.beatLengthToQuarterLengthRatio)
     for i in range(0, len(progression), window):
@@ -263,7 +260,7 @@ def analyze_progressions(full_progression, window):
 if __name__ == "__main__":
     s = Stream()
     for c in read_progression(
-        "output/chords.txt", "output/durations.txt", max_chords=15
+        "output/chords.txt", "output/durations.txt", max_chords=60
     ):
         s.append(c)
     analyze_progressions(s, 3)
@@ -278,5 +275,5 @@ if __name__ == "__main__":
 
     # print(f"min dist triad from major: {min_distance_from_key(3)}")
     # print(f"min dist triad from minor: {min_distance_from_key(3, mode='minor')}")
-    # annotated = annotate(s, 3, closedPosition=True)
-    # annotated.show()
+    annotated = annotate(s, 3)
+    annotated.show()
