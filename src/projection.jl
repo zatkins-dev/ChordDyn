@@ -2,8 +2,8 @@ export project_onto, trajectory_to_chord_progression
 
 function project_onto(t::TriangularLattice, θ1, θ2)
     """Convert θ1, θ2 ∈ [0, 2π]² to t.xlims × t.ylims"""
-    local x = rescale_to_lims(mod(θ1, 16π) / 16π, xlims(t))
-    local y = rescale_to_lims(mod(θ2, 12π) / 12π, ylims(t))
+    local x = rescale_to_lims(mod(θ2, 12π) / 12π, xlims(t))
+    local y = rescale_to_lims(mod(θ1, 16π) / 16π, ylims(t))
     x, y
 end
 
@@ -34,6 +34,10 @@ function project_onto(tonnetz::Tonnetz, θ1, θ2, notemode=false)
     end
 end
 
+function round_duration(duration, precision=0.125)
+    return round(round(duration / precision) * precision, digits=3)
+end
+
 function trajectory_to_chord_progression(tonnetz, θ₁, θ₂, t; notemode=false)
     chords = []
     durations = []
@@ -54,5 +58,5 @@ function trajectory_to_chord_progression(tonnetz, θ₁, θ₂, t; notemode=fals
             end
         end
     end
-    return chords, durations
+    return chords, round_duration.(2 * durations)
 end

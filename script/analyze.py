@@ -263,7 +263,7 @@ def analyze_progressions(full_progression, window):
 if __name__ == "__main__":
     s = Stream()
     for c in read_progression(
-        "output/chords.txt", "output/durations.txt", max_chords=15
+        "output/chords-section.txt", "output/durations-section.txt", max_chords=15
     ):
         s.append(c)
     analyze_progressions(s, 3)

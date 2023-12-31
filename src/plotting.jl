@@ -1,4 +1,4 @@
-export LatexTicks, dt_color, trajectory!, trajectory3!, arrow3d!, plot, plot_pendulum_on_tonnetz, animate_pendulum, draw_pendulum!
+export LatexTicks, dt_color, trajectory!, trajectory3!, arrow3d!, plot, plot_pendulum_on_tonnetz, animate_pendulum, animate_tonnetz, draw_pendulum!
 import CairoMakie.plot
 
 ## Plotting Utilities
@@ -68,12 +68,13 @@ function plot(t::TriangularLattice; xres=1920)
     return f, ax
 end
 
-eharmonic(n::Int) = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "χ", "ε"][mod(n, 12)+1]
+eharmonic(n::Int) = [L"0", L"1", L"2", L"3", L"4", L"5", L"6", L"7", L"8", L"9", L"χ", L"ε"][mod(n, 12)+1]
+eharmonic_char(n::Int) = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'χ', 'ε'][mod(n, 12)+1]
 midi(n::Int) = "$n"
 octave(n::Int) = "$(n ÷ 12)"
-note(n::Int) = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", 'B'][mod(n, 12)+1]
+note(n::Int) = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"][mod(n, 12)+1]
 
-vertexlabel_fns = (:eharmonic, :midi, :octave, :note)
+vertexlabel_fns = (:eharmonic, :eharmonic_char, :midi, :octave, :note)
 
 function get_triangles(t::TriangularLattice, color=:blue)
     xs = xlims(t)
@@ -144,7 +145,7 @@ function CairoMakie.plot(tonnetz::Tonnetz; xres=1920, vertexlabels=:eharmonic)
     @assert vertexlabels in vertexlabel_fns "vertexlabels must be one of $(vertexlabel_fns)"
 
     aspect = xlength(tonnetz) / ylength(tonnetz)
-    f = Figure(resolution=(xres, xres / aspect), backgroundcolor=:transparent)
+    f = Figure(resolution=(xres, xres / aspect), backgroundcolor=:white)
     ax = Axis(f[1, 1], xgridvisible=false, ygridvisible=false, xticksvisible=false, yticksvisible=false, backgroundcolor=:transparent)
     hidespines!(ax)
     hidedecorations!(ax)
@@ -164,29 +165,45 @@ function CairoMakie.plot(tonnetz::Tonnetz; xres=1920, vertexlabels=:eharmonic)
     split_triangles = Polygon[]
 
     markers = eval(:($vertexlabels.(notes($tonnetz))))
-    longest_marker = maximum(length.(markers))
+    longest_marker = vertexlabels == :eharmonic_char ? 1 : maximum(length.(markers))
     textsize = 32 - 4 * (longest_marker - 1)
     scatter!(points(tonnetz); marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(points(tonnetz); marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(points(tonnetz); text="" .* (markers), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    if vertexlabels == :eharmonic_char
+        scatter!(points(tonnetz); marker=markers, color=:black, markersize=32, label=nothing, transparent=false)
+    else
+        text!(points(tonnetz); text=markers, align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    end
     left_col = points(tonnetz)[1:12] .+ Vec2f(xlength(tonnetz), 0)
     scatter!(left_col; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(left_col; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(left_col; text="" .* (markers[1:12]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    if vertexlabels == :eharmonic_char
+        scatter!(left_col; marker=markers[1:12], color=:black, markersize=32, label=nothing, transparent=false)
+    else
+        text!(left_col; text=markers[1:12], align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    end
     top_row = points(tonnetz)[1:24:end] .+ Vec2f(0, ylength(tonnetz))
     scatter!(top_row; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(top_row; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(top_row; text="" .* (markers[1:24:end]), font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    if vertexlabels == :eharmonic_char
+        scatter!(top_row; marker=markers[1:24:end], color=:black, markersize=32, label=nothing, transparent=false)
+    else
+        text!(top_row; text=markers[1:24:end], align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    end
     tl = points(tonnetz)[1] .+ Vec2f(xlength(tonnetz), ylength(tonnetz))
     scatter!(tl; marker=:circle, color=:black, markersize=64, label=nothing, transparent=false)
     scatter!(tl; marker=:circle, color=:white, markersize=56, label=nothing, transparent=false)
-    text!(tl; text="" * markers[1], font="ComicCodeLigatures NF", align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    if vertexlabels == :eharmonic_char
+        scatter!(tl; marker=markers[1], color=:black, markersize=32, label=nothing, transparent=false)
+    else
+        text!(tl; text=markers[1], align=(:center, :center), color=:black, textsize=textsize, transparent=false)
+    end
+
     resize_to_layout!(f)
     return f, ax
 end
 
-function plot_pendulum_on_tonnetz(tonnetz, X, t; arrowsize=24, linewidth=4)
-    fig, ax = plot(tonnetz)
+function trajectory_to_tonnetz(tonnetz, X)
     pts = project_onto.(Ref(tonnetz.t), X[1, :], X[2, :])
     θ₁ = [p[1] for p in pts]
     θ₂ = [p[2] for p in pts]
@@ -201,9 +218,20 @@ function plot_pendulum_on_tonnetz(tonnetz, X, t; arrowsize=24, linewidth=4)
             vy[i] = -sign(vy[i]) * (ylength(tonnetz) - abs(vy[i]))
         end
     end
-    V = hcat(vx, vy)'
-    trajectory!(xs[:, 1:end-1], V; colors=:black, arrowsize=arrowsize + 3, linewidth=linewidth + 1.5)
-    trajectory!(xs[:, 1:end-1], V, colors=t[1:end-1]; arrowsize=arrowsize, linewidth=linewidth)
+    vs = hcat(vx, vy)'
+    xs, vs
+end
+
+function plot_pendulum_on_tonnetz(tonnetz, X, t; colors=:black, arrowsize=24, linewidth=4, arrows=nothing, vertexlabels=:eharmonic)
+    fig, ax = plot(tonnetz, vertexlabels=vertexlabels)
+    xs, vs = trajectory_to_tonnetz(tonnetz, X)
+    if !isnothing(arrows)
+        axs, avs = trajectory_to_tonnetz(tonnetz, arrows)
+    else
+        axs, avs = xs, vs
+    end
+    trajectory!(axs[:, 1:end-1], avs; colors=colors, arrowsize=arrowsize, linewidth=linewidth)
+    trajectory!(xs[:, 1:end-1], vs; colors=colors, linewidth=linewidth, arrowsize=0)
     return fig, ax
 end
 
@@ -266,7 +294,51 @@ function animate_pendulum(dp::DoublePendulum, θ₁, θ₂, t; output="output/pe
     else
         itr = round.(range(1, length(t), length=round(Int, (t[end] - t[1]) * framerate)))
     end
+    idx = 0
     record(f, output, itr; framerate=framerate) do frame
         tstep[] = frame
+        idx += 1
+        print("\rFrame $(idx)/$(length(itr))")
     end
+    println("")
+end
+
+function animate_tonnetz(dp::DoublePendulum, X, t; output="output/tonnetz_anim.mp4", framerate=nothing, vertexlabels=:eharmonic)
+    tstep = Observable(1)
+    dt = t[2] - t[1]
+    tonnetz = Tonnetz()
+    s = TemporalSection(0.06125)
+    Xhat, that = section(s, X, t; interpolate=false)
+
+    xs, vs = trajectory_to_tonnetz(tonnetz, X)
+    axs, avs = trajectory_to_tonnetz(tonnetz, Xhat)
+
+    f, ax = plot(tonnetz, vertexlabels=vertexlabels)
+
+    colormap = [(:white, 0.0), (:grey, 0.3), (:black, 1.0)]
+    tstart = @lift(max(1, $tstep - 1000))
+    tend = @lift(min(length(t), $tstep))
+    thatend = @lift(isnothing(findfirst(that .>= t[$tend])) ? length(that) : findfirst(that .>= t[$tend]))
+
+    scatter!(@lift([axs[1, $thatend]]), @lift([axs[2, $thatend]]); color=:black, markersize=48)
+    colors = @lift(t[$tstart:$tend])
+    lines!(@lift(xs[:, $tstart:$tend]); color=colors, linewidth=8, colormap=colormap, transparency=true)
+
+    # trajectory!(@lift(xs[:, $tstart:$tend-1]), @lift(vs[:, $tstart:$tend]); colors=@lift(t[$tstart:$tend-1]), colormap=colormap, linewidth=4, arrowsize=0)
+
+    itr = nothing
+    if isnothing(framerate)
+        framerate = round(Int, 1 / dt)
+        itr = eachindex(t)
+    else
+        itr = round.(range(1, length(t), length=round(Int, (t[end] - t[1]) * framerate)))
+    end
+    println("Starting rendering...length(that) = $(length(that)), length(t) = $(length(t)))")
+    idx = 0
+    record(f, output, itr; framerate=framerate) do frame
+        tstep[] = frame
+        idx += 1
+        print("\rFrame $(idx)/$(length(itr))")
+    end
+    println("")
 end

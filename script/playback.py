@@ -34,7 +34,12 @@ def read_progression(
                 # skip if duration is too short
                 continue
         else:
-            duration = m21.duration.Duration(d)
+            try:
+                duration = m21.duration.Duration(d)
+            except e:
+                print(e)
+                print(f"chord {c}, duration {d}")
+                raise e
         try:
             chord = Chord(c.tolist(), duration=duration)
             if force_octave is not None:
@@ -51,7 +56,7 @@ if __name__ == "__main__":
     # progression.show()
     # output = Stream()
     for c in read_progression(
-        "output/chords.txt", "output/durations.txt", True, force_octave=5
+        "output/chords-section.txt", "output/durations-section.txt"
     ):
         symbol = m21.harmony.chordSymbolFromChord(c)
         progression.append(symbol)
